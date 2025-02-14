@@ -125,10 +125,6 @@ Sys.sleep(15)  # Aguarda 15 segundos para carregar toda a página
 
 ---
 
-## 👨‍💻 Autor
-
-👤 **José Tenório Abs Junior**  
-📧 [Seu Email]  
-🏛 **IBPAD - Instituto Brasileiro de Pesquisa e Análise de Dados**  
+ 
 
 🚀 **Agora você pode monitorar cursos automaticamente!** Qualquer dúvida, me avise! 😊
