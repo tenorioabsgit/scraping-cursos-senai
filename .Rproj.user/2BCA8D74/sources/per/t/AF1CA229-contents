@@ -1,0 +1,126 @@
+# Instalar e carregar pacotes necessários
+if (!require(chromote)) install.packages("chromote")
+if (!require(rvest)) install.packages("rvest")
+if (!require(dplyr)) install.packages("dplyr")
+if (!require(gmailr)) install.packages("gmailr")
+if (!require(knitr)) install.packages("knitr")
+if (!require(kableExtra)) install.packages("kableExtra")
+
+library(chromote)
+library(rvest)
+library(dplyr)
+library(gmailr)
+library(knitr)
+library(kableExtra)
+
+# Configurar o caminho para o Chrome
+Sys.setenv(CHROMOTE_CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe")
+
+# Criar uma instância do navegador
+b <- ChromoteSession$new()
+
+# URL desejada
+url <- "https://al.senai.br/nossos-cursos/?unidade=poco"
+
+# Navegar para a URL
+b$Page$navigate(url)
+
+# Aguardar o carregamento completo da página
+Sys.sleep(10)
+
+# Capturar o HTML da página
+html_content <- b$Runtime$evaluate(expression = "document.documentElement.outerHTML")$result$value
+
+# Parsear o HTML usando rvest
+html_parsed <- read_html(html_content)
+
+# Capturar todos os cartões de curso
+cards <- html_parsed %>%
+  html_nodes(".card-content")
+
+# Inicializar listas para armazenar os dados
+nomes <- c()
+datas <- c()
+investimentos <- c()
+
+# Iterar sobre cada cartão e extrair informações
+for (card in cards) {
+  nome <- tryCatch(card %>% html_node("h3.card-title.card-title-curso-b2c") %>% html_text(trim = TRUE), error = function(e) NA)
+  data <- tryCatch(card %>% html_node("p.card-text:contains('Inicio:') strong") %>% html_text(trim = TRUE), error = function(e) NA)
+  investimento <- tryCatch(card %>% html_node("p.card-text:contains('Investimento:') strong") %>% html_text(trim = TRUE), error = function(e) NA)
+  
+  nomes <- c(nomes, nome)
+  datas <- c(datas, data)
+  investimentos <- c(investimentos, investimento)
+}
+
+# Criar um dataframe com os dados
+cursos_df <- data.frame(
+  Curso = nomes,
+  DataInicio = datas,
+  Investimento = investimentos,
+  stringsAsFactors = FALSE
+)
+
+# Organizar o dataframe em ordem alfabética
+cursos_df <- cursos_df %>%
+  arrange(Curso, DataInicio)
+
+# Salvar a tabela atual
+file_atual <- "cursos_atual.csv"
+write.csv(cursos_df, file_atual, row.names = FALSE)
+
+# Carregar a tabela anterior, se existir
+file_anterior <- "cursos_anterior.csv"
+if (file.exists(file_anterior)) {
+  tabela_anterior <- read.csv(file_anterior, stringsAsFactors = FALSE)
+} else {
+  tabela_anterior <- data.frame(Curso = character(), stringsAsFactors = FALSE)
+}
+
+# Comparar tabelas
+cursos_novos <- setdiff(cursos_df$Curso, tabela_anterior$Curso)
+cursos_removidos <- setdiff(tabela_anterior$Curso, cursos_df$Curso)
+
+# Gerar o relatório
+relatorio_html <- paste0(
+  "<h1>Relatório de Cursos</h1>",
+  "<p><strong>Data:</strong> ", Sys.Date(), "</p>",
+  if (length(cursos_novos) > 0) paste("<h2>Cursos Novos:</h2><ul><li>", paste(cursos_novos, collapse = "</li><li>"), "</li></ul>") else "<h2>Nenhum curso novo.</h2>",
+  if (length(cursos_removidos) > 0) paste("<h2>Cursos Removidos:</h2><ul><li>", paste(cursos_removidos, collapse = "</li><li>"), "</li></ul>") else "<h2>Nenhum curso removido.</h2>",
+  "<h2>Cursos Disponíveis no Momento:</h2>",
+  cursos_df %>% 
+    kable(format = "html", table.attr = "style='width:100%; border: 1px solid black; border-collapse: collapse;'", align = "c") %>% 
+    kable_styling(full_width = TRUE)
+)
+
+# Salvar a tabela atual como a nova base anterior
+file.copy(file_atual, file_anterior, overwrite = TRUE)
+
+# Configurar o Gmail
+gm_auth_configure(path = "client_secret_208328056935-62acfnpgaf7i4jicavur7g99kur1rv64.apps.googleusercontent.com.json")
+gm_auth(email = "tenorioabs@gmail.com")
+
+# Função para enviar o e-mail
+enviar_email <- function(de, para, assunto, corpo_html) {
+  mensagem <- gm_mime() %>%
+    gm_to(para) %>%
+    gm_from(de) %>%
+    gm_subject(assunto) %>%
+    gm_html_body(corpo_html)
+  
+  gm_send_message(mensagem)
+  cat("E-mail enviado com sucesso!\n")
+}
+
+# Configurar os detalhes do e-mail
+de <- "tenorioabs@gmail.com"
+para <- c("thatiany.carvalho@al.senai.br", "tenorioabs@gmail.com")
+assunto <- paste0("Relatório de Cursos | ", format(Sys.Date(), "%d/%m/%Y - %A"))
+corpo_html <- relatorio_html
+
+# Enviar o e-mail
+enviar_email(de, para, assunto, corpo_html)
+
+# Finalizar a sessão do navegador
+b$close()

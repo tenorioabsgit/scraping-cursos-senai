@@ -1,0 +1,37 @@
+# Carregar a biblioteca necessária
+library(gmailr)
+
+# Configurar a API do Gmail
+# Certifique-se de que você configurou as credenciais do Google API e salvou o arquivo JSON correspondente
+gm_auth_configure(path = "")
+
+gm_auth(email = TRUE)
+
+# Função para enviar e-mail
+enviar_email <- function(de, para, assunto, corpo) {
+  tryCatch({
+    # Criar a mensagem
+    mensagem <- gm_mime(
+      To = para,
+      From = de,
+      Subject = assunto,
+      body = corpo
+    )
+    
+    # Enviar o e-mail
+    gm_send_message(mensagem)
+    cat("E-mail enviado com sucesso!\n")
+  }, error = function(e) {
+    cat("Erro ao enviar o e-mail:\n", e$message, "\n")
+  })
+}
+
+# Configurar os detalhes do e-mail
+de <- "email@gmail.com"
+para <- "email@hotmail.com"
+assunto <- "Teste do gmail para o hotmail"
+corpo <- "Este é o corpo do e-mail."
+
+# Enviar o e-mail
+enviar_email(de, para, assunto, corpo)
+
